@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:notio/screens/splash_screen.dart';
+import 'package:notio/screens/splash_screen.dart'; // Import the new SplashScreen
 
 void main() {
   runApp(const MyApp());
@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
           seedColor: Colors.cyanAccent,
           brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: Colors.black,
+        scaffoldBackgroundColor: const Color.fromARGB(255, 244, 238, 238),
 
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey[900],
@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      home: const SplashScreen(),
+      home: const SplashScreen(), // Set SplashScreen as the initial screen
     );
   }
 }
