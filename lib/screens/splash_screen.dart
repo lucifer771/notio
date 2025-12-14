@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:notio/screens/notes_list_screen.dart';
 import 'package:notio/widgets/tech_loading_animation.dart';
+import 'package:notio/screens/notes_list_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,11 +17,12 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   _navigateToHome() async {
-    // Simulate some loading time, e.g., fetching initial data or setting up services
-    await Future.delayed(const Duration(seconds: 3), () {});
+    await Future.delayed(
+      const Duration(seconds: 5),
+      () {},
+    ); // Display splash for 5 seconds
     if (mounted) {
-      Navigator.pushReplacement(
-        context,
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const NotesListScreen()),
       );
     }
@@ -29,12 +30,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: SizedBox.expand(
-        child: TechLoadingAnimation(
-          loadingText: 'NOTIO BOOTING UP...', // Customize your text here
-        ),
-      ),
-    );
+    return const Scaffold(body: TechLoadingAnimation());
   }
 }
