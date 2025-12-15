@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:notio/models/note.dart';
 import 'package:notio/screens/create_note_screen.dart';
+import 'package:notio/screens/note_edit_screen.dart';
 import 'package:notio/widgets/animated_logo.dart';
 import 'package:notio/widgets/note_card.dart';
 
@@ -28,6 +29,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (result != null && result is Note) {
       _addNote(result);
+    }
+  }
+
+  Future<void> _navigateToEditNote(Note note) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NoteEditScreen(note: note)),
+    );
+
+    if (result != null) {
+      if (result == 'DELETE_NOTE') {
+        setState(() {
+          _notes.removeWhere((n) => n.id == note.id);
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Note deleted')));
+      } else if (result is Note) {
+        setState(() {
+          final index = _notes.indexWhere((n) => n.id == note.id);
+          if (index != -1) {
+            _notes[index] = result;
+          }
+        });
+      }
     }
   }
 
@@ -146,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             content: note.content,
                             date:
                                 '${note.createdAt.day}/${note.createdAt.month}',
+                            onTap: () => _navigateToEditNote(note),
                           );
                         }, childCount: _notes.length),
                       ),

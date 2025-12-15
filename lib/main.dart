@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:notio/screens/intro_screen.dart';
+import 'package:notio/screens/splash_screen.dart';
 import 'package:notio/theme/app_theme.dart';
 
 void main() {
@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'NOTIO',
       theme: AppTheme.darkTheme,
-      home: const IntroScreen(),
+      home: const SplashScreen(),
     );
   }
 }

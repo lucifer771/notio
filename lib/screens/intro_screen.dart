@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:notio/screens/home_screen.dart';
 import 'package:notio/widgets/animated_logo.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class IntroScreen extends StatefulWidget {
   const IntroScreen({super.key});
@@ -47,7 +48,12 @@ class _IntroScreenState extends State<IntroScreen>
     super.dispose();
   }
 
-  void _navigateToHome() {
+  Future<void> _navigateToHome() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('seen_intro', true);
+
+    if (!mounted) return;
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 800),

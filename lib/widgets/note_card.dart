@@ -4,12 +4,14 @@ class NoteCard extends StatelessWidget {
   final String title;
   final String content;
   final String date;
+  final VoidCallback? onTap;
 
   const NoteCard({
     super.key,
     required this.title,
     required this.content,
     required this.date,
+    this.onTap,
   });
 
   @override
@@ -38,7 +40,7 @@ class NoteCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {},
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

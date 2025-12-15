@@ -52,6 +52,31 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     }
   }
 
+  Future<void> _deleteNote() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Note?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      Navigator.of(context).pop('DELETE_NOTE');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -59,6 +84,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         title: Text(widget.note == null ? 'Create New Note' : 'Edit Note'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          if (widget.note != null)
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _deleteNote,
+            ),
           IconButton(icon: const Icon(Icons.save), onPressed: _saveNote),
         ],
       ),
