@@ -14,6 +14,10 @@ class Note {
   final List<String> tags;
   final String? folderId; // Optional: for organizing notes into folders
   final Color? backgroundColor; // Optional: for note customization
+  final bool isPinned; // New
+  final bool isLocked; // New
+  final List<String> imagePaths; // New
+  final String? voicePath; // New
 
   const Note({
     required this.id,
@@ -25,6 +29,10 @@ class Note {
     this.tags = const [],
     this.folderId,
     this.backgroundColor,
+    this.isPinned = false,
+    this.isLocked = false,
+    this.imagePaths = const [],
+    this.voicePath,
   });
 
   Note copyWith({
@@ -37,6 +45,10 @@ class Note {
     List<String>? tags,
     String? folderId,
     Color? backgroundColor,
+    bool? isPinned,
+    bool? isLocked,
+    List<String>? imagePaths,
+    String? voicePath,
   }) {
     return Note(
       id: id ?? this.id,
@@ -48,10 +60,14 @@ class Note {
       tags: tags ?? this.tags,
       folderId: folderId ?? this.folderId,
       backgroundColor: backgroundColor ?? this.backgroundColor,
+      isPinned: isPinned ?? this.isPinned,
+      isLocked: isLocked ?? this.isLocked,
+      imagePaths: imagePaths ?? this.imagePaths,
+      voicePath: voicePath ?? this.voicePath,
     );
   }
 
-  // Convert Note to JSON for storage (e.g., Hive, Firestore)
+  // Convert Note to JSON for storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -63,6 +79,10 @@ class Note {
       'tags': tags,
       'folderId': folderId,
       'backgroundColor': backgroundColor?.value, // Store color as int
+      'isPinned': isPinned,
+      'isLocked': isLocked,
+      'imagePaths': imagePaths,
+      'voicePath': voicePath,
     };
   }
 
@@ -78,11 +98,16 @@ class Note {
       ),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
-      tags: List<String>.from(json['tags'] as List),
+      tags: (json['tags'] as List?)?.map((e) => e as String).toList() ?? [],
       folderId: json['folderId'] as String?,
       backgroundColor: json['backgroundColor'] != null
           ? Color(json['backgroundColor'] as int)
           : null,
+      isPinned: json['isPinned'] ?? false,
+      isLocked: json['isLocked'] ?? false,
+      imagePaths:
+          (json['imagePaths'] as List?)?.map((e) => e as String).toList() ?? [],
+      voicePath: json['voicePath'] as String?,
     );
   }
 }

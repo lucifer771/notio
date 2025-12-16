@@ -2,15 +2,25 @@ class UserProfile {
   final String id;
   final String name;
   final String email;
-  final int avatarIndex; // 0-11 for different characters
-  final int frameIndex; // 0: None, 1: Neon, 2: Gold, 3: Cyberpunk, etc.
+  final String username; // New
+  final String bio; // New
+  final String? profileImagePath; // New
+  final String? password; // New (For App Lock)
+  final bool isAppLockEnabled; // New
+  final int avatarIndex;
+  final int frameIndex;
   final bool isGuest;
-  final Map<String, dynamic> stats; // For productivity score etc.
+  final Map<String, dynamic> stats;
 
   const UserProfile({
     required this.id,
     required this.name,
     required this.email,
+    this.username = '',
+    this.bio = '',
+    this.profileImagePath,
+    this.password,
+    this.isAppLockEnabled = false,
     this.avatarIndex = 0,
     this.frameIndex = 0,
     this.isGuest = false,
@@ -30,6 +40,11 @@ class UserProfile {
   UserProfile copyWith({
     String? name,
     String? email,
+    String? username,
+    String? bio,
+    String? profileImagePath,
+    String? password,
+    bool? isAppLockEnabled,
     int? avatarIndex,
     int? frameIndex,
     bool? isGuest,
@@ -39,6 +54,11 @@ class UserProfile {
       id: id,
       name: name ?? this.name,
       email: email ?? this.email,
+      username: username ?? this.username,
+      bio: bio ?? this.bio,
+      profileImagePath: profileImagePath ?? this.profileImagePath,
+      password: password ?? this.password,
+      isAppLockEnabled: isAppLockEnabled ?? this.isAppLockEnabled,
       avatarIndex: avatarIndex ?? this.avatarIndex,
       frameIndex: frameIndex ?? this.frameIndex,
       isGuest: isGuest ?? this.isGuest,
@@ -51,6 +71,11 @@ class UserProfile {
       'id': id,
       'name': name,
       'email': email,
+      'username': username,
+      'bio': bio,
+      'profileImagePath': profileImagePath,
+      'password': password,
+      'isAppLockEnabled': isAppLockEnabled,
       'avatarIndex': avatarIndex,
       'frameIndex': frameIndex,
       'isGuest': isGuest,
@@ -63,6 +88,11 @@ class UserProfile {
       id: json['id'] ?? 'guest',
       name: json['name'] ?? 'Guest',
       email: json['email'] ?? '',
+      username: json['username'] ?? '',
+      bio: json['bio'] ?? '',
+      profileImagePath: json['profileImagePath'],
+      password: json['password'],
+      isAppLockEnabled: json['isAppLockEnabled'] ?? false,
       avatarIndex: json['avatarIndex'] ?? 0,
       frameIndex: json['frameIndex'] ?? 0,
       isGuest: json['isGuest'] ?? false,

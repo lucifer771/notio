@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:notio/screens/home_screen.dart';
 import 'package:notio/screens/intro_screen.dart';
+import 'package:notio/screens/lock_screen.dart';
+import 'package:notio/services/storage_service.dart';
 import 'package:notio/widgets/animated_logo.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,11 +43,21 @@ class _SplashScreenState extends State<SplashScreen>
     final seenIntro = prefs.getBool('seen_intro') ?? false;
 
     if (mounted) {
+      Widget targetScreen = const IntroScreen();
+
+      if (seenIntro) {
+        final user = StorageService().getUserProfile();
+        if (!user.isGuest && user.isAppLockEnabled && user.password != null) {
+          targetScreen = const LockScreen();
+        } else {
+          targetScreen = const HomeScreen();
+        }
+      }
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 1000),
-          pageBuilder: (_, __, ___) =>
-              seenIntro ? const HomeScreen() : const IntroScreen(),
+          pageBuilder: (_, __, ___) => targetScreen,
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(opacity: animation, child: child);
           },
