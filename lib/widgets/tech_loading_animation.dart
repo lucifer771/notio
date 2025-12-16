@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:notio/models/particle.dart';
 
 class TechLoadingAnimation extends StatefulWidget {
   final String loadingText;
@@ -364,36 +365,4 @@ class _TechLoadingPainter extends CustomPainter {
         oldDelegate.particles.length !=
             particles.length; // Simple check for particles
   }
-}
-
-class Particle {
-  Offset position;
-  Offset velocity;
-  Color color;
-  double size;
-  double lifetime; // 0.0 to 1.0
-  double progress = 0.0;
-
-  Particle({
-    required this.position,
-    required this.velocity,
-    required this.color,
-    required this.size,
-    required this.lifetime,
-  });
-
-  void update(double animationValue) {
-    // Simple update based on the controller's value
-    // This makes particles move and fade over the duration of the particleController
-    progress = animationValue / lifetime;
-    if (progress <= 1.0) {
-      position +=
-          velocity *
-          (animationValue -
-              (progress == 0 ? 0 : (animationValue - _previousAnimationValue)));
-    }
-    _previousAnimationValue = animationValue;
-  }
-
-  double _previousAnimationValue = 0.0;
 }
