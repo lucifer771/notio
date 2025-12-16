@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:notio/models/user_model.dart';
 import 'package:notio/screens/home_screen.dart';
+import 'package:notio/services/storage_service.dart';
 import 'package:notio/widgets/animated_logo.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,6 +14,7 @@ class IntroScreen extends StatefulWidget {
 
 class _IntroScreenState extends State<IntroScreen>
     with SingleTickerProviderStateMixin {
+  final TextEditingController _nameController = TextEditingController();
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -19,6 +22,7 @@ class _IntroScreenState extends State<IntroScreen>
   @override
   void initState() {
     super.initState();
+    // ... existing init code ...
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -45,12 +49,29 @@ class _IntroScreenState extends State<IntroScreen>
   @override
   void dispose() {
     _controller.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _navigateToHome() async {
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name to continue')),
+      );
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('seen_intro', true);
+
+    // Save User Name
+    await StorageService().saveUserProfile(
+      UserProfile(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text.trim(),
+        email: '',
+      ),
+    );
 
     if (!mounted) return;
 
@@ -80,53 +101,78 @@ class _IntroScreenState extends State<IntroScreen>
           ),
         ),
         child: SafeArea(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(flex: 2),
-              const AnimatedLogo(size: 150),
-              const SizedBox(height: 40),
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [
-                    Text(
-                      'NOTIO',
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                        color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(flex: 2),
+                const AnimatedLogo(size: 150),
+                const SizedBox(height: 40),
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Column(
+                    children: [
+                      Text(
+                        'NOTIO',
+                        style: Theme.of(context).textTheme.displayLarge
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 4,
+                              color: Colors.white,
+                            ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Write Smarter.',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: Colors.grey[400],
-                            fontWeight: FontWeight.w300,
+                      const SizedBox(height: 16),
+                      Text(
+                        'Write Smarter.',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.grey[400],
+                              fontWeight: FontWeight.w300,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(flex: 2),
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "What's your name?",
+                        style: TextStyle(color: Colors.grey[400], fontSize: 16),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _nameController,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.1),
+                          hintText: 'Enter your name',
+                          hintStyle: TextStyle(color: Colors.grey[600]),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            borderSide: BorderSide.none,
                           ),
-                    ),
-                  ],
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(flex: 3),
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildDot(false),
-                    _buildDot(true),
-                    _buildDot(false),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              SlideTransition(
-                position: _slideAnimation,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                const SizedBox(height: 40),
+                SlideTransition(
+                  position: _slideAnimation,
                   child: ElevatedButton(
                     onPressed: _navigateToHome,
                     style: ElevatedButton.styleFrom(
@@ -136,7 +182,7 @@ class _IntroScreenState extends State<IntroScreen>
                       elevation: 10,
                       shadowColor: Theme.of(
                         context,
-                      ).colorScheme.primary.withOpacity(0.5),
+                      ).colorScheme.primary.withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30),
                       ),
@@ -151,25 +197,11 @@ class _IntroScreenState extends State<IntroScreen>
                     ),
                   ),
                 ),
-              ),
-              const Spacer(),
-            ],
+                const Spacer(),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDot(bool isActive) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      width: isActive ? 12 : 8,
-      height: isActive ? 12 : 8,
-      decoration: BoxDecoration(
-        color: isActive
-            ? Theme.of(context).colorScheme.secondary
-            : Colors.grey[800],
-        shape: BoxShape.circle,
       ),
     );
   }

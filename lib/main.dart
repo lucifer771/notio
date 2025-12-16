@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:notio/screens/splash_screen.dart';
 import 'package:notio/theme/app_theme.dart';
 
-void main() {
+import 'package:notio/services/storage_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await StorageService().init();
   runApp(const MyApp());
 }
 

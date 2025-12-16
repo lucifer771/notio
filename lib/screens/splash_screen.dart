@@ -23,32 +23,11 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    _iconGlowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _iconGlowController, curve: Curves.easeInOut),
-    );
 
-    // Dots Animation
-    _dotsController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-    _dotScaleAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(parent: _dotsController, curve: Curves.easeInOut),
-    );
-    _dotOpacityAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _dotsController, curve: Curves.easeInOut),
-    );
-
-    // Text Fade-in Animation
-    _textFadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    _textFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _textFadeController, curve: Curves.easeIn),
-    );
-
-    _textFadeController.forward(); // Start text fade-in
+    _scaleAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.05,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
     // Navigate after a delay
     _navigateToHome();
@@ -56,6 +35,11 @@ class _SplashScreenState extends State<SplashScreen>
 
   _navigateToHome() async {
     await Future.delayed(const Duration(seconds: 4)); // Display for 4 seconds
+    if (!mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final seenIntro = prefs.getBool('seen_intro') ?? false;
+
     if (mounted) {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
