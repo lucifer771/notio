@@ -70,6 +70,7 @@ class _IntroScreenState extends State<IntroScreen>
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text.trim(),
         email: '',
+        isGuest: true, // User entering only name is a Guest
       ),
     );
 

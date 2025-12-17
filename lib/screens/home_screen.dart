@@ -9,6 +9,7 @@ import 'package:notio/widgets/search_overlay.dart';
 import 'package:notio/services/storage_service.dart';
 import 'package:notio/widgets/animated_logo.dart';
 import 'package:notio/widgets/note_card.dart';
+import 'package:notio/widgets/collaboration_animation.dart';
 import 'package:uuid/uuid.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -188,6 +189,21 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _showWelcomeAnimation() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return CollaborationAnimation(
+          user: _userProfile,
+          onComplete: () {
+            if (Navigator.canPop(context)) Navigator.pop(context);
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -252,7 +268,10 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Colors.transparent, // Keep it clean
           title: Row(
             children: [
-              const AnimatedLogo(size: 32, animate: false),
+              GestureDetector(
+                onTap: _showWelcomeAnimation,
+                child: const AnimatedLogo(size: 32, animate: false),
+              ),
               const SizedBox(width: 12),
               Text(
                 'NOTIO',

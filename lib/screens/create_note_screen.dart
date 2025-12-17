@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:notio/models/note.dart';
-import 'package:notio/screens/home_screen.dart'; // Using HomeScreen navigation if needed
+// Using HomeScreen navigation if needed
 import 'package:notio/services/storage_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -95,6 +95,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
   void _showNoteOptions() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true, // Prevent overflow
       backgroundColor: const Color(0xFF1A1A2E), // Dark theme
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -102,67 +103,72 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Note Options',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Note Options',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildOptionTile(Icons.label_outline, 'Add Tag', () {
-                    Navigator.pop(context);
-                    // Open Tag selector (simplified for now)
-                  }),
-                  _buildOptionTile(
-                    _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                    _isPinned ? 'Unpin Note' : 'Pin Note',
-                    () {
-                      setState(() => _isPinned = !_isPinned);
-                      setModalState(() {}); // Update sheet UI
-                      // Also update main screen
-                    },
-                    isActive: _isPinned,
-                  ),
-                  _buildOptionTile(
-                    _isLocked ? Icons.lock : Icons.lock_open,
-                    _isLocked ? 'Unlock Note' : 'Lock Note',
-                    () {
-                      setState(() => _isLocked = !_isLocked);
-                      setModalState(() {});
-                    },
-                    isActive: _isLocked,
-                  ),
-                  _buildOptionTile(Icons.image_outlined, 'Add Image', () {
-                    Navigator.pop(context);
-                    _pickImage();
-                  }),
-                  _buildOptionTile(Icons.mic_none, 'Add Voice Memo', () {}),
-                  _buildOptionTile(Icons.share_outlined, 'Export', () {}),
-                  _buildOptionTile(Icons.delete_outline, 'Delete', () {
-                    // Delete logic
-                    if (widget.note != null) {
-                      StorageService().deleteNote(widget.note!.id);
-                    }
-                    Navigator.pop(context); // Close sheet
-                    Navigator.pop(context); // Close screen
-                  }, color: Colors.redAccent),
-                ],
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildOptionTile(Icons.label_outline, 'Add Tag', () {
+                      Navigator.pop(context);
+                      // Open Tag selector (simplified for now)
+                    }),
+                    _buildOptionTile(
+                      _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      _isPinned ? 'Unpin Note' : 'Pin Note',
+                      () {
+                        setState(() => _isPinned = !_isPinned);
+                        setModalState(() {}); // Update sheet UI
+                        // Also update main screen
+                      },
+                      isActive: _isPinned,
+                    ),
+                    _buildOptionTile(
+                      _isLocked ? Icons.lock : Icons.lock_open,
+                      _isLocked ? 'Unlock Note' : 'Lock Note',
+                      () {
+                        setState(() => _isLocked = !_isLocked);
+                        setModalState(() {});
+                      },
+                      isActive: _isLocked,
+                    ),
+                    _buildOptionTile(Icons.image_outlined, 'Add Image', () {
+                      Navigator.pop(context);
+                      _pickImage();
+                    }),
+                    _buildOptionTile(Icons.mic_none, 'Add Voice Memo', () {}),
+                    _buildOptionTile(Icons.share_outlined, 'Export', () {}),
+                    _buildOptionTile(Icons.delete_outline, 'Delete', () {
+                      // Delete logic
+                      if (widget.note != null) {
+                        StorageService().deleteNote(widget.note!.id);
+                      }
+                      Navigator.pop(context); // Close sheet
+                      Navigator.pop(context); // Close screen
+                    }, color: Colors.redAccent),
+                  ],
+                ),
               ),
             );
           },
