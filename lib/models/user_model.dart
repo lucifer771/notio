@@ -2,11 +2,11 @@ class UserProfile {
   final String id;
   final String name;
   final String email;
-  final String username; // New
-  final String bio; // New
-  final String? profileImagePath; // New
-  final String? password; // New (For App Lock)
-  final bool isAppLockEnabled; // New
+  final String username;
+  final String bio;
+  final String? profileImagePath;
+  final String? appLockPin; // Renamed from password for clarity
+  final bool isAppLockEnabled;
   final int avatarIndex;
   final int frameIndex;
   final bool isGuest;
@@ -19,7 +19,7 @@ class UserProfile {
     this.username = '',
     this.bio = '',
     this.profileImagePath,
-    this.password,
+    this.appLockPin,
     this.isAppLockEnabled = false,
     this.avatarIndex = 0,
     this.frameIndex = 0,
@@ -43,7 +43,7 @@ class UserProfile {
     String? username,
     String? bio,
     String? profileImagePath,
-    String? password,
+    String? appLockPin,
     bool? isAppLockEnabled,
     int? avatarIndex,
     int? frameIndex,
@@ -57,7 +57,7 @@ class UserProfile {
       username: username ?? this.username,
       bio: bio ?? this.bio,
       profileImagePath: profileImagePath ?? this.profileImagePath,
-      password: password ?? this.password,
+      appLockPin: appLockPin ?? this.appLockPin,
       isAppLockEnabled: isAppLockEnabled ?? this.isAppLockEnabled,
       avatarIndex: avatarIndex ?? this.avatarIndex,
       frameIndex: frameIndex ?? this.frameIndex,
@@ -74,7 +74,7 @@ class UserProfile {
       'username': username,
       'bio': bio,
       'profileImagePath': profileImagePath,
-      'password': password,
+      'appLockPin': appLockPin,
       'isAppLockEnabled': isAppLockEnabled,
       'avatarIndex': avatarIndex,
       'frameIndex': frameIndex,
@@ -91,7 +91,8 @@ class UserProfile {
       username: json['username'] ?? '',
       bio: json['bio'] ?? '',
       profileImagePath: json['profileImagePath'],
-      password: json['password'],
+      appLockPin:
+          json['appLockPin'], // Load from local or backend if provided (unlikely)
       isAppLockEnabled: json['isAppLockEnabled'] ?? false,
       avatarIndex: json['avatarIndex'] ?? 0,
       frameIndex: json['frameIndex'] ?? 0,

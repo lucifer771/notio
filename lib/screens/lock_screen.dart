@@ -22,13 +22,13 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   void _unlock() {
-    if (_pinController.text == _user.password) {
+    if (_pinController.text == _user.appLockPin) {
       Navigator.of(
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     } else {
       setState(() {
-        _errorText = 'Incorrect Password';
+        _errorText = 'Incorrect PIN';
         _pinController.clear();
       });
     }
@@ -57,7 +57,7 @@ class _LockScreenState extends State<LockScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Enter your password to unlock',
+                'Enter your PIN to unlock',
                 style: TextStyle(color: Colors.grey[400]),
               ),
               const SizedBox(height: 48),

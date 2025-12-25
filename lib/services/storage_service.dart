@@ -6,6 +6,7 @@ import 'package:notio/models/user_model.dart';
 
 class StorageService {
   static const String keyUserProfile = 'user_profile';
+  static const String keyAuthToken = 'auth_token';
   static const String keyNotes = 'notes';
   static const String keyTags = 'tags';
   static const String keyIntroSeen = 'seen_intro';
@@ -19,6 +20,19 @@ class StorageService {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+  }
+
+  // --- Auth Token ---
+  Future<void> saveAuthToken(String token) async {
+    await _prefs.setString(keyAuthToken, token);
+  }
+
+  String? getAuthToken() {
+    return _prefs.getString(keyAuthToken);
+  }
+
+  Future<void> clearAuthToken() async {
+    await _prefs.remove(keyAuthToken);
   }
 
   // --- User Profile ---
@@ -45,7 +59,9 @@ class StorageService {
     final profile = UserProfile.fromJson(jsonDecode(userJson));
 
     // Migration/Fix: If profile has no email/password but isGuest is false, treat as Guest
-    if (!profile.isGuest && profile.email.isEmpty && profile.password == null) {
+    if (!profile.isGuest &&
+        profile.email.isEmpty &&
+        profile.appLockPin == null) {
       return profile.copyWith(isGuest: true);
     }
     return profile;

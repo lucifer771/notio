@@ -18,6 +18,7 @@ class Note {
   final bool isLocked; // New
   final List<String> imagePaths; // New
   final String? voicePath; // New
+  final int? textColor; // New: Store color value as int
 
   const Note({
     required this.id,
@@ -33,6 +34,7 @@ class Note {
     this.isLocked = false,
     this.imagePaths = const [],
     this.voicePath,
+    this.textColor,
   });
 
   Note copyWith({
@@ -49,6 +51,7 @@ class Note {
     bool? isLocked,
     List<String>? imagePaths,
     String? voicePath,
+    int? textColor,
   }) {
     return Note(
       id: id ?? this.id,
@@ -64,6 +67,7 @@ class Note {
       isLocked: isLocked ?? this.isLocked,
       imagePaths: imagePaths ?? this.imagePaths,
       voicePath: voicePath ?? this.voicePath,
+      textColor: textColor ?? this.textColor,
     );
   }
 
@@ -83,6 +87,7 @@ class Note {
       'isLocked': isLocked,
       'imagePaths': imagePaths,
       'voicePath': voicePath,
+      'textColor': textColor,
     };
   }
 
@@ -108,6 +113,7 @@ class Note {
       imagePaths:
           (json['imagePaths'] as List?)?.map((e) => e as String).toList() ?? [],
       voicePath: json['voicePath'] as String?,
+      textColor: json['textColor'] as int?,
     );
   }
 }

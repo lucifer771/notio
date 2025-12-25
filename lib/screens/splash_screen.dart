@@ -47,7 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (seenIntro) {
         final user = StorageService().getUserProfile();
-        if (!user.isGuest && user.isAppLockEnabled && user.password != null) {
+        if (!user.isGuest && user.isAppLockEnabled && user.appLockPin != null) {
           targetScreen = const LockScreen();
         } else {
           targetScreen = const HomeScreen();

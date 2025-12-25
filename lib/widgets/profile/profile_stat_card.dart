@@ -19,26 +19,27 @@ class ProfileStatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E), // Card dark bg
-        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF1E1E2C).withOpacity(0.6), // Sheer Glass
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isPremium
               ? const Color(0xFFFFD700).withOpacity(0.3)
-              : Colors.white.withOpacity(0.05),
+              : Colors.white.withOpacity(0.08),
+          width: 1.5,
         ),
         boxShadow: isPremium
             ? [
                 BoxShadow(
-                  color: const Color(0xFFFFD700).withOpacity(0.1),
-                  blurRadius: 15,
-                  spreadRadius: -5,
+                  color: const Color(0xFFFFD700).withOpacity(0.15),
+                  blurRadius: 20,
+                  spreadRadius: -2,
                 ),
               ]
             : [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
                 ),
               ],
       ),

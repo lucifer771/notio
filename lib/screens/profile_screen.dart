@@ -1,15 +1,13 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:notio/models/user_model.dart';
 import 'package:notio/screens/auth_screen.dart';
+import 'package:notio/services/api_service.dart';
 import 'package:notio/services/storage_service.dart';
 import 'package:notio/utils/constants.dart';
 import 'package:notio/widgets/cross_platform_image.dart';
 import 'package:notio/widgets/profile/avatar_selector_sheet.dart';
 import 'package:notio/widgets/profile/profile_menu_item.dart';
 import 'package:notio/widgets/profile/profile_stat_card.dart';
-import 'package:notio/widgets/verification_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -43,16 +41,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserProfile();
   }
 
-  // Cloud-Ready: Simulate async fetch (even though local now)
+  // Cloud-Ready: Async Fetch
   Future<void> _loadUserProfile() async {
-    // In a real cloud app, this would be `await _repository.getUserProfile()`
-    final profile = StorageService().getUserProfile();
+    // 1. Load local cache first for speed
+    final localProfile = StorageService().getUserProfile();
     setState(() {
-      _user = profile;
+      _user = localProfile;
       _nameController.text = _user.name;
       _usernameController.text = _user.username;
       _bioController.text = _user.bio;
     });
+
+    // 2. Fetch fresh data from API
+    try {
+      final remoteProfile = await ApiService().fetchProfile();
+      if (remoteProfile != null) {
+        // Merge or replace? For now replace.
+        // Identify if there are unsynced changes? (Out of scope for this task)
+        await StorageService().saveUserProfile(remoteProfile);
+        setState(() {
+          _user = remoteProfile;
+          _nameController.text = _user.name;
+          _usernameController.text = _user.username;
+          _bioController.text = _user.bio;
+        });
+      }
+    } catch (e) {
+      // API might fail if offline, just rely on cache
+      print('Failed to sync profile: $e');
+    }
   }
 
   // Cloud-Ready: Async Save Operation
@@ -125,16 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _toggleAppLock(bool value) async {
-    if (value && (_user.password == null || _user.password!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Set a password first by signing up'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+    if (value && (_user.appLockPin == null || _user.appLockPin!.isEmpty)) {
+      _showSetPinDialog(); // Prompt to set PIN if missing
       return;
     }
-    // Cloud-ready: Optimistic update or wait? Let's wait.
+    // Optimistic update
     setState(() => _isLoading = true);
     final updatedUser = _user.copyWith(isAppLockEnabled: value);
     await StorageService().saveUserProfile(updatedUser);
@@ -144,51 +156,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  void _changePasswordFlow() {
-    showDialog(
-      context: context,
-      builder: (_) => VerificationDialog(
-        email: _user.email,
-        onVerified: () {
-          _showNewPasswordDialog(); // Continue flow
-        },
-      ),
-    );
+  void _changePinFlow() {
+    _showSetPinDialog();
   }
 
-  void _showNewPasswordDialog() {
-    final passController = TextEditingController();
+  void _showSetPinDialog() {
+    final pinController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A2E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          'Set New Password',
+          'Set App Lock PIN',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "Make sure it's secure and at least 6 characters.",
+              "Enter a 4-digit PIN to secure your app.",
               style: TextStyle(color: Colors.grey, fontSize: 13),
             ),
             const SizedBox(height: 20),
             TextField(
-              controller: passController,
+              controller: pinController,
               obscureText: true,
-              style: const TextStyle(color: Colors.white),
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                letterSpacing: 8,
+              ),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.black.withOpacity(0.3),
-                hintText: 'New Password',
+                hintText: '••••',
                 hintStyle: TextStyle(color: Colors.grey[600]),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
-                prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
+                counterText: '',
               ),
             ),
           ],
@@ -200,16 +211,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (passController.text.length < 6) {
+              if (pinController.text.length < 4) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password too short')),
+                  const SnackBar(content: Text('PIN must be 4 digits')),
                 );
                 return;
               }
-              // Update Password
+              // Update PIN and Enable Lock
               Navigator.pop(ctx);
               setState(() => _isLoading = true);
-              final updatedUser = _user.copyWith(password: passController.text);
+              final updatedUser = _user.copyWith(
+                appLockPin: pinController.text,
+                isAppLockEnabled: true,
+              );
               await StorageService().saveUserProfile(updatedUser);
               setState(() {
                 _user = updatedUser;
@@ -218,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Password updated successfully!'),
+                    content: Text('App Lock Enabled Successfully!'),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -231,7 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             child: const Text(
-              'Update',
+              'Set PIN',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -245,6 +259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _logout() async {
     // Cloud-ready: SignOut from Auth Provider
+    ApiService().clearToken();
     final guest = UserProfile.guest();
     await StorageService().saveUserProfile(guest);
     if (mounted) Navigator.pop(context);
@@ -300,14 +315,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: Container(
         // Subtle Gradient Background
+        // Premium Deep Gradient Background
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0F1226), // Slightly lighter top
-              Color(0xFF0A0E21), // Deep dark bottom
-            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF0F1226), Color(0xFF161B33), Color(0xFF0A0E21)],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: SingleChildScrollView(
@@ -359,6 +373,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // ... (Header and other widgets remain same or can be omitted if not changed in chunk)
+
+  Widget _buildSettingsMenu() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 8, bottom: 16),
+          child: Text(
+            'Security',
+            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ProfileMenuItem(
+          title: 'App Lock',
+          subtitle: 'Require PIN on launch',
+          icon: Icons.security,
+          trailing: Switch(
+            value: _user.isAppLockEnabled,
+            onChanged: _toggleAppLock,
+            activeColor: const Color(0xFF6C63FF),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_user.isAppLockEnabled)
+          ProfileMenuItem(
+            title: 'Change PIN',
+            icon: Icons.lock_reset,
+            onTap: _changePinFlow,
+            trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+          ),
+      ],
     );
   }
 
@@ -552,38 +601,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _buildTextField('Username', _usernameController, Icons.alternate_email),
         const SizedBox(height: 16),
         _buildTextField('Bio', _bioController, Icons.info_outline, maxLines: 3),
-      ],
-    );
-  }
-
-  Widget _buildSettingsMenu() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 8, bottom: 16),
-          child: Text(
-            'Security',
-            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-          ),
-        ),
-        ProfileMenuItem(
-          title: 'App Lock',
-          subtitle: 'Require password on launch',
-          icon: Icons.security,
-          trailing: Switch(
-            value: _user.isAppLockEnabled,
-            onChanged: _toggleAppLock,
-            activeColor: const Color(0xFF6C63FF),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ProfileMenuItem(
-          title: 'Change Password',
-          icon: Icons.lock_reset,
-          onTap: _changePasswordFlow,
-          trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-        ),
       ],
     );
   }

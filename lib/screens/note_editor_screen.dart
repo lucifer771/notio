@@ -5,7 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:notio/models/note.dart';
 import 'package:notio/models/tag.dart';
 import 'package:notio/widgets/tag_selector.dart';
+import 'package:notio/services/gemini_service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/foundation.dart';
 
 class NoteEditorScreen extends StatefulWidget {
   final Note? note;
@@ -34,6 +39,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   bool _isLocked = false;
   List<String> _imagePaths = [];
   String? _voicePath;
+  Color _textColor = Colors.white;
+
+  // AI & Voice
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+  final GeminiService _geminiService = GeminiService(); // Use Service
+  bool _isGenerating = false;
+  String _aiStatus = '';
 
   final ImagePicker _picker = ImagePicker();
 
@@ -51,6 +64,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _isLocked = widget.note?.isLocked ?? false;
     _imagePaths = List.from(widget.note?.imagePaths ?? []);
     _voicePath = widget.note?.voicePath;
+    if (widget.note?.textColor != null) {
+      _textColor = Color(widget.note!.textColor!);
+    }
+
+    _speech = stt.SpeechToText();
   }
 
   @override
@@ -82,6 +100,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       isLocked: _isLocked,
       imagePaths: _imagePaths,
       voicePath: _voicePath,
+      textColor: _textColor.value,
     );
 
     Navigator.pop(context, note);
@@ -128,6 +147,126 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     }
   }
 
+  // --- Voice Typing ---
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) {
+          if (val == 'done' || val == 'notListening') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (val) => print('onError: $val'),
+      );
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (val) {
+            setState(() {
+              // Append logic
+              if (val.recognizedWords.isNotEmpty && val.finalResult) {
+                final currentText = _contentController.text;
+                final space =
+                    currentText.isNotEmpty && !currentText.endsWith(' ')
+                    ? ' '
+                    : '';
+                _contentController.text =
+                    '$currentText$space${val.recognizedWords}';
+                _contentController.selection = TextSelection.fromPosition(
+                  TextPosition(offset: _contentController.text.length),
+                );
+              }
+            });
+          },
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
+  }
+
+  // --- Realtime Streaming AI ---
+  Future<void> _performAIMagic(String promptType) async {
+    final text = _contentController.text;
+    if (text.isEmpty && promptType != 'Generate Idea') {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Write something first!')));
+      return;
+    }
+
+    setState(() {
+      _isGenerating = true;
+      _aiStatus = 'Thinking...';
+    });
+
+    try {
+      String prompt = '';
+      bool replace = false;
+
+      switch (promptType) {
+        case 'Fix Grammar':
+          prompt =
+              'Fix grammar and spelling, keep same language. Return ONLY the fixed text: "$text"';
+          replace = true;
+          break;
+        case 'Professional Rewrite':
+          prompt = 'Rewrite this ensuring a professional tone: "$text"';
+          replace = true;
+          break;
+        case 'Summarize':
+          prompt = 'Summarize this in bullet points: "$text"';
+          break;
+        case 'Continue Writing':
+          prompt = 'Continue writing creatively from here: "$text"';
+          break;
+        case 'Generate Idea':
+          prompt = 'Generate a creative note idea about productivity.';
+          break;
+      }
+
+      print('AI Magic Started: $promptType');
+      print('Prompt: $prompt');
+
+      // Use Streaming API via Service
+      print('Creating Stream...');
+      final stream = _geminiService.generateStream(prompt);
+      print('Stream Created. Listening for chunks...');
+
+      if (replace) {
+        _contentController.text = ''; // Clear for replacement
+      } else {
+        if (_contentController.text.isNotEmpty) {
+          _contentController.text += '\n\n';
+        }
+      }
+
+      await for (final chunk in stream) {
+        if (chunk.text != null) {
+          print('Chunk received: ${chunk.text}');
+          setState(() {
+            _aiStatus = 'Writing...';
+            _contentController.text += chunk.text!;
+            // Scroll to bottom/end
+            _contentController.selection = TextSelection.fromPosition(
+              TextPosition(offset: _contentController.text.length),
+            );
+          });
+        }
+      }
+      print('AI Magic Completed Successfully');
+    } catch (e) {
+      print('AI ERROR CAUGHT: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('AI Error: $e')));
+    } finally {
+      print('AI IsGenerating set to false');
+      setState(() => _isGenerating = false);
+    }
+  }
+
   void _showTagSelector() {
     showModalBottomSheet(
       context: context,
@@ -163,72 +302,319 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     );
   }
 
+  void _showAIMagicSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor:
+          Colors.transparent, // Transparent to show blurred container
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E2E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            boxShadow: [
+              BoxShadow(color: Colors.black54, blurRadius: 20, spreadRadius: 5),
+            ],
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[700],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Icon(
+                        Icons.auto_awesome,
+                        color: Color(0xFFFFD700),
+                        size: 28,
+                      )
+                      .animate(onPlay: (loop) => loop.repeat(reverse: true))
+                      .scale(
+                        begin: const Offset(1, 1),
+                        end: const Offset(1.2, 1.2),
+                      ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'AI Magic',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Real-time intelligent writing assistance.',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              const SizedBox(height: 24),
+
+              _buildModernMagicTile(
+                'Fix Grammar',
+                'Corrects spelling & grammar',
+                Icons.spellcheck,
+                Colors.blue,
+              ),
+              _buildModernMagicTile(
+                'Professional Rewrite',
+                'Formal & polished tone',
+                Icons.work_outline,
+                Colors.amber,
+              ),
+              _buildModernMagicTile(
+                'Summarize',
+                'Create concise bullet points',
+                Icons.summarize_outlined,
+                Colors.purple,
+              ),
+              _buildModernMagicTile(
+                'Continue Writing',
+                'Let AI finish your thought',
+                Icons.edit_note_outlined,
+                Colors.green,
+              ),
+              _buildModernMagicTile(
+                'Generate Idea',
+                'Get a creative note idea',
+                Icons.lightbulb_outline,
+                Colors.cyan,
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModernMagicTile(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: Colors.white24),
+        onTap: () {
+          Navigator.pop(context);
+          _performAIMagic(title);
+        },
+      ),
+    );
+  }
+
+  void _showColorPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final colors = [
+          Colors.white,
+          Colors.redAccent,
+          Colors.orangeAccent,
+          Colors.yellowAccent,
+          Colors.greenAccent,
+          Colors.blueAccent,
+          Colors.purpleAccent,
+          Colors.pinkAccent,
+        ];
+        return Container(
+          padding: const EdgeInsets.all(24),
+          height: 200,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '🎨 Choose Font Color',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: colors.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 16),
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() => _textColor = colors[index]);
+                        Navigator.pop(context); // Close color picker
+                        Navigator.pop(context); // Close options menu
+                      },
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: colors[index],
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: _textColor == colors[index] ? 3 : 0,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colors[index].withOpacity(0.4),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showNoteOptions() {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1A1A2E), // Dark theme
+      isScrollControlled: true, // Fix overflow
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Note Options',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+            return SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Note Options',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Font Colors Option
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.palette_outlined,
+                          color: Colors.pinkAccent,
                         ),
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.grey),
+                      title: const Text(
+                        'Change Font Color',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  _buildOptionTile(Icons.label_outline, 'Add Tag', () {
-                    Navigator.pop(context);
-                    _showTagSelector();
-                  }),
-                  _buildOptionTile(
-                    _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                    _isPinned ? 'Unpin Note' : 'Pin Note',
-                    () {
-                      setState(() => _isPinned = !_isPinned);
-                      setModalState(() {});
-                    },
-                    isActive: _isPinned,
-                  ),
-                  _buildOptionTile(
-                    _isLocked ? Icons.lock : Icons.lock_open,
-                    _isLocked ? 'Unlock Note' : 'Lock Note',
-                    () {
-                      setState(() => _isLocked = !_isLocked);
-                      setModalState(() {});
-                    },
-                    isActive: _isLocked,
-                  ),
-                  _buildOptionTile(Icons.image_outlined, 'Add Image', () {
-                    Navigator.pop(context);
-                    _pickImage();
-                  }),
-                  _buildOptionTile(Icons.mic_none, 'Add Voice Memo', () {}),
-                  _buildOptionTile(Icons.share_outlined, 'Export', () {}),
-                  _buildOptionTile(Icons.delete_outline, 'Delete', () {
-                    Navigator.pop(context);
-                    _deleteNote();
-                  }, color: Colors.redAccent),
-                ],
+                      trailing: CircleAvatar(
+                        backgroundColor: _textColor,
+                        radius: 10,
+                      ),
+                      onTap: () => _showColorPicker(),
+                    ),
+
+                    _buildOptionTile(Icons.label_outline, 'Add Tag', () {
+                      Navigator.pop(context);
+                      _showTagSelector();
+                    }),
+                    _buildOptionTile(
+                      _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                      _isPinned ? 'Unpin Note' : 'Pin Note',
+                      () {
+                        setState(() => _isPinned = !_isPinned);
+                        setModalState(() {});
+                      },
+                      isActive: _isPinned,
+                    ),
+                    _buildOptionTile(
+                      _isLocked ? Icons.lock : Icons.lock_open,
+                      _isLocked ? 'Unlock Note' : 'Lock Note',
+                      () {
+                        setState(() => _isLocked = !_isLocked);
+                        setModalState(() {});
+                      },
+                      isActive: _isLocked,
+                    ),
+                    _buildOptionTile(Icons.image_outlined, 'Add Image', () {
+                      Navigator.pop(context);
+                      _pickImage();
+                    }),
+                    _buildOptionTile(Icons.mic_none, 'Add Voice Memo', () {}),
+                    _buildOptionTile(Icons.share_outlined, 'Export', () {}),
+                    _buildOptionTile(Icons.delete_outline, 'Delete', () {
+                      Navigator.pop(context);
+                      _deleteNote();
+                    }, color: Colors.redAccent),
+                    const SizedBox(height: 20), // Extra padding for safe area
+                  ],
+                ),
               ),
             );
           },
@@ -304,7 +690,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               onPressed: _saveNote,
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF6C63FF),
-                backgroundColor: const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                backgroundColor: const Color(0xFF6C63FF).withOpacity(0.1),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -317,152 +703,231 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Tags Row
-                    if (displayedTags.isNotEmpty)
-                      Container(
-                        height: 40,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: displayedTags.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final tag = displayedTags[index];
-                            return Chip(
-                              label: Text(
-                                tag.name,
-                                style: TextStyle(
-                                  color: Color(tag.color),
-                                  fontSize: 12,
-                                ),
-                              ),
-                              backgroundColor: Color(
-                                tag.color,
-                              ).withValues(alpha: 0.15),
-                              side: BorderSide.none,
-                              padding: const EdgeInsets.all(0),
-                              deleteIcon: Icon(
-                                Icons.close,
-                                size: 14,
-                                color: Color(tag.color),
-                              ),
-                              onDeleted: () => setState(
-                                () => _selectedTagIds.remove(tag.id),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Tags Row
+                        if (displayedTags.isNotEmpty)
+                          Container(
+                            height: 40,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: displayedTags.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final tag = displayedTags[index];
+                                return Chip(
+                                  label: Text(
+                                    tag.name,
+                                    style: TextStyle(
+                                      color: Color(tag.color),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  backgroundColor: Color(
+                                    tag.color,
+                                  ).withOpacity(0.15),
+                                  side: BorderSide.none,
+                                  padding: const EdgeInsets.all(0),
+                                  deleteIcon: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: Color(tag.color),
+                                  ),
+                                  onDeleted: () => setState(
+                                    () => _selectedTagIds.remove(tag.id),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
 
-                    TextField(
-                      controller: _titleController,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Title',
-                        hintStyle: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
+                        TextField(
+                          controller: _titleController,
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: _textColor,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Title',
+                            hintStyle: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          maxLines: null,
                         ),
-                        border: InputBorder.none,
-                      ),
-                      maxLines: null,
+                        const SizedBox(height: 8),
+                        Text(
+                          '${_currentDate.day}/${_currentDate.month}/${_currentDate.year}  ${_currentDate.hour}:${_currentDate.minute.toString().padLeft(2, '0')}',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Image Attachments
+                        if (_imagePaths.isNotEmpty)
+                          SizedBox(
+                            height: 150,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _imagePaths.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: kIsWeb
+                                      ? Image.network(
+                                          _imagePaths[index],
+                                          height: 150,
+                                          width: 150,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Image.file(
+                                          File(_imagePaths[index]),
+                                          height: 150,
+                                          width: 150,
+                                          fit: BoxFit.cover,
+                                        ),
+                                );
+                              },
+                            ),
+                          ),
+                        if (_imagePaths.isNotEmpty) const SizedBox(height: 16),
+
+                        TextField(
+                          controller: _contentController,
+                          style: TextStyle(
+                            color: _textColor.withOpacity(0.9),
+                            fontSize: 16,
+                            height: 1.5,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Start writing...',
+                            hintStyle: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 16,
+                            ),
+                            border: InputBorder.none,
+                          ),
+                          maxLines: null,
+                          textCapitalization: TextCapitalization.sentences,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_currentDate.day}/${_currentDate.month}/${_currentDate.year}  ${_currentDate.hour}:${_currentDate.minute.toString().padLeft(2, '0')}',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Image Attachments
-                    if (_imagePaths.isNotEmpty)
-                      SizedBox(
-                        height: 150,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _imagePaths.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                File(_imagePaths[index]),
-                                height: 150,
-                                width: 150,
-                                fit: BoxFit.cover,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    if (_imagePaths.isNotEmpty) const SizedBox(height: 16),
-
-                    TextField(
-                      controller: _contentController,
-                      style: TextStyle(
-                        color: Colors.grey[300],
-                        fontSize: 16,
-                        height: 1.5,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Start writing...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey[700],
-                          fontSize: 16,
-                        ),
-                        border: InputBorder.none,
-                      ),
-                      maxLines: null,
-                      textCapitalization: TextCapitalization.sentences,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Bottom Toolbar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF161622),
-                border: Border(
-                  top: BorderSide(color: Colors.white.withOpacity(0.05)),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildToolbarIcon(Icons.mic_none, () {}),
-                  _buildToolbarIcon(Icons.auto_awesome, () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('AI Magic coming soon!')),
-                    );
-                  }, color: const Color(0xFFFFD700)),
-                  _buildToolbarIcon(Icons.image_outlined, _pickImage),
-                  _buildToolbarIcon(
-                    Icons.local_offer_outlined,
-                    _showTagSelector,
                   ),
-                  _buildToolbarIcon(Icons.more_horiz, _showNoteOptions),
-                ],
-              ),
+                ),
+
+                // Bottom Toolbar
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161622),
+                    border: Border(
+                      top: BorderSide(color: Colors.white.withOpacity(0.05)),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _isListening
+                          ? _buildToolbarIcon(
+                                  Icons.mic_none,
+                                  _listen,
+                                  color: Colors.redAccent,
+                                )
+                                .animate(
+                                  onPlay: (loop) => loop.repeat(reverse: true),
+                                )
+                                .scale(
+                                  begin: const Offset(1, 1),
+                                  end: const Offset(1.2, 1.2),
+                                  duration: 1000.ms,
+                                )
+                          : _buildToolbarIcon(Icons.mic_none, _listen),
+
+                      _buildToolbarIcon(Icons.auto_awesome, () {
+                        _showAIMagicSheet();
+                      }, color: const Color(0xFFFFD700)),
+                      _buildToolbarIcon(Icons.image_outlined, _pickImage),
+                      _buildToolbarIcon(
+                        Icons.local_offer_outlined,
+                        _showTagSelector,
+                      ),
+                      _buildToolbarIcon(Icons.more_horiz, _showNoteOptions),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+
+          // AI Loading Overlay
+          if (_isGenerating)
+            Positioned(
+              bottom: 100,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6C63FF),
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6C63FF).withOpacity(0.4),
+                        blurRadius: 15,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        _aiStatus,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ).animate().fadeIn().slideY(begin: 0.5, end: 0),
+        ],
       ),
     );
   }
