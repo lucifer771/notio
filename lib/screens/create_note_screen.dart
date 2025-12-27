@@ -7,7 +7,7 @@ import 'package:notio/services/storage_service.dart';
 import 'package:notio/services/gemini_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:google_generative_ai/google_generative_ai.dart';
+
 import 'package:flutter_animate/flutter_animate.dart';
 
 class CreateNoteScreen extends StatefulWidget {
@@ -89,8 +89,8 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 final currentText = _contentController.text;
                 final space =
                     currentText.isNotEmpty && !currentText.endsWith(' ')
-                    ? ' '
-                    : '';
+                        ? ' '
+                        : '';
                 _contentController.text =
                     '$currentText$space${val.recognizedWords}';
                 _contentController.selection = TextSelection.fromPosition(
@@ -164,11 +164,11 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
       }
 
       await for (final chunk in stream) {
-        if (chunk.text != null) {
-          print('Chunk received: ${chunk.text}');
+        if (chunk.isNotEmpty) {
+          print('Chunk received: $chunk');
           setState(() {
             _aiStatus = 'Writing...';
-            _contentController.text += chunk.text!;
+            _contentController.text += chunk;
             // Scroll to bottom/end
             _contentController.selection = TextSelection.fromPosition(
               TextPosition(offset: _contentController.text.length),
@@ -223,12 +223,10 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               Row(
                 children: [
                   const Icon(
-                        Icons.auto_awesome,
-                        color: Color(0xFFFFD700),
-                        size: 28,
-                      )
-                      .animate(onPlay: (loop) => loop.repeat(reverse: true))
-                      .scale(
+                    Icons.auto_awesome,
+                    color: Color(0xFFFFD700),
+                    size: 28,
+                  ).animate(onPlay: (loop) => loop.repeat(reverse: true)).scale(
                         begin: const Offset(1, 1),
                         end: const Offset(1.2, 1.2),
                       ),
@@ -249,7 +247,6 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 24),
-
               _buildModernMagicTile(
                 'Fix Grammar',
                 'Corrects spelling & grammar',
@@ -624,7 +621,6 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                           ),
                         ),
                       if (_imagePaths.isNotEmpty) const SizedBox(height: 24),
-
                       TextField(
                         controller: _contentController,
                         style: TextStyle(
@@ -721,24 +717,23 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 children: [
                   _isListening
                       ? _buildToolbarBtn(
-                              Icons.mic,
-                              Colors.redAccent,
-                              () => _listen(),
-                            )
-                            .animate(
-                              onPlay: (loop) => loop.repeat(reverse: true),
-                            )
-                            .scale(
-                              begin: const Offset(1, 1),
-                              end: const Offset(1.2, 1.2),
-                              duration: 1000.ms,
-                            )
+                          Icons.mic,
+                          Colors.redAccent,
+                          () => _listen(),
+                        )
+                          .animate(
+                            onPlay: (loop) => loop.repeat(reverse: true),
+                          )
+                          .scale(
+                            begin: const Offset(1, 1),
+                            end: const Offset(1.2, 1.2),
+                            duration: 1000.ms,
+                          )
                       : _buildToolbarBtn(
                           Icons.mic,
                           Colors.white,
                           () => _listen(),
                         ),
-
                   _buildToolbarBtn(
                     Icons.auto_awesome,
                     const Color(0xFFFFD700),

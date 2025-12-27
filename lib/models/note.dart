@@ -7,7 +7,7 @@ class Note {
   final String id;
   final String title;
   final String
-  content; // Could be plain text, rich text JSON, or file path for handwritten/media
+      content; // Could be plain text, rich text JSON, or file path for handwritten/media
   final NoteType type;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -16,6 +16,8 @@ class Note {
   final Color? backgroundColor; // Optional: for note customization
   final bool isPinned; // New
   final bool isLocked; // New
+  final bool isArchived; // New
+  final bool isTrashed; // New
   final List<String> imagePaths; // New
   final String? voicePath; // New
   final int? textColor; // New: Store color value as int
@@ -32,6 +34,8 @@ class Note {
     this.backgroundColor,
     this.isPinned = false,
     this.isLocked = false,
+    this.isArchived = false,
+    this.isTrashed = false,
     this.imagePaths = const [],
     this.voicePath,
     this.textColor,
@@ -49,6 +53,8 @@ class Note {
     Color? backgroundColor,
     bool? isPinned,
     bool? isLocked,
+    bool? isArchived,
+    bool? isTrashed,
     List<String>? imagePaths,
     String? voicePath,
     int? textColor,
@@ -65,6 +71,8 @@ class Note {
       backgroundColor: backgroundColor ?? this.backgroundColor,
       isPinned: isPinned ?? this.isPinned,
       isLocked: isLocked ?? this.isLocked,
+      isArchived: isArchived ?? this.isArchived,
+      isTrashed: isTrashed ?? this.isTrashed,
       imagePaths: imagePaths ?? this.imagePaths,
       voicePath: voicePath ?? this.voicePath,
       textColor: textColor ?? this.textColor,
@@ -85,6 +93,8 @@ class Note {
       'backgroundColor': backgroundColor?.value, // Store color as int
       'isPinned': isPinned,
       'isLocked': isLocked,
+      'isArchived': isArchived,
+      'isTrashed': isTrashed,
       'imagePaths': imagePaths,
       'voicePath': voicePath,
       'textColor': textColor,
@@ -110,6 +120,8 @@ class Note {
           : null,
       isPinned: json['isPinned'] ?? false,
       isLocked: json['isLocked'] ?? false,
+      isArchived: json['isArchived'] ?? false,
+      isTrashed: json['isTrashed'] ?? false,
       imagePaths:
           (json['imagePaths'] as List?)?.map((e) => e as String).toList() ?? [],
       voicePath: json['voicePath'] as String?,

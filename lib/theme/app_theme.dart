@@ -23,4 +23,29 @@ class AppTheme {
       ),
     );
   }
+
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF6200EA),
+        brightness: Brightness.light,
+        primary: const Color(0xFF6200EA),
+        secondary: const Color(0xFF00E5FF),
+        surface: const Color(0xFFFFFFFF),
+        background: const Color(0xFFF5F5F7),
+      ),
+      scaffoldBackgroundColor: const Color(0xFFF5F5F7),
+      textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: IconThemeData(color: Colors.black),
+        titleTextStyle: TextStyle(
+            color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
 }

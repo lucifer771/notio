@@ -8,7 +8,7 @@ import 'package:notio/widgets/tag_selector.dart';
 import 'package:notio/services/gemini_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:google_generative_ai/google_generative_ai.dart';
+
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/foundation.dart';
 
@@ -16,17 +16,21 @@ class NoteEditorScreen extends StatefulWidget {
   final Note? note;
   final List<Tag> availableTags;
   final Function(Tag) onTagCreated;
+  final Function(String)? onTagDeleted; // New Callback
 
   const NoteEditorScreen({
     super.key,
     this.note,
     required this.availableTags,
     required this.onTagCreated,
+    this.onTagDeleted,
   });
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
 }
+
+// ... (State class remains the same until _showTagSelector)
 
 class _NoteEditorScreenState extends State<NoteEditorScreen> {
   late TextEditingController _titleController;
@@ -168,8 +172,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 final currentText = _contentController.text;
                 final space =
                     currentText.isNotEmpty && !currentText.endsWith(' ')
-                    ? ' '
-                    : '';
+                        ? ' '
+                        : '';
                 _contentController.text =
                     '$currentText$space${val.recognizedWords}';
                 _contentController.selection = TextSelection.fromPosition(
@@ -243,11 +247,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       }
 
       await for (final chunk in stream) {
-        if (chunk.text != null) {
-          print('Chunk received: ${chunk.text}');
+        if (chunk.isNotEmpty) {
+          print('Chunk received: $chunk');
           setState(() {
             _aiStatus = 'Writing...';
-            _contentController.text += chunk.text!;
+            _contentController.text += chunk;
             // Scroll to bottom/end
             _contentController.selection = TextSelection.fromPosition(
               TextPosition(offset: _contentController.text.length),
@@ -270,11 +274,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   void _showTagSelector() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.7,
         child: TagSelector(
@@ -296,6 +297,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             setState(() {
               _selectedTagIds.add(newTag.id);
             });
+          },
+          onTagDeleted: (tagId) {
+            setState(() {
+              _selectedTagIds.remove(tagId);
+            });
+            widget.onTagDeleted?.call(tagId);
           },
         ),
       ),
@@ -336,12 +343,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               Row(
                 children: [
                   const Icon(
-                        Icons.auto_awesome,
-                        color: Color(0xFFFFD700),
-                        size: 28,
-                      )
-                      .animate(onPlay: (loop) => loop.repeat(reverse: true))
-                      .scale(
+                    Icons.auto_awesome,
+                    color: Color(0xFFFFD700),
+                    size: 28,
+                  ).animate(onPlay: (loop) => loop.repeat(reverse: true)).scale(
                         begin: const Offset(1, 1),
                         end: const Offset(1.2, 1.2),
                       ),
@@ -362,7 +367,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 24),
-
               _buildModernMagicTile(
                 'Fix Grammar',
                 'Corrects spelling & grammar',
@@ -683,7 +687,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               padding: EdgeInsets.only(right: 8),
               child: Icon(Icons.lock, color: Color(0xFF6C63FF), size: 20),
             ),
-
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: TextButton(
@@ -851,20 +854,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     children: [
                       _isListening
                           ? _buildToolbarIcon(
-                                  Icons.mic_none,
-                                  _listen,
-                                  color: Colors.redAccent,
-                                )
-                                .animate(
-                                  onPlay: (loop) => loop.repeat(reverse: true),
-                                )
-                                .scale(
-                                  begin: const Offset(1, 1),
-                                  end: const Offset(1.2, 1.2),
-                                  duration: 1000.ms,
-                                )
+                              Icons.mic_none,
+                              _listen,
+                              color: Colors.redAccent,
+                            )
+                              .animate(
+                                onPlay: (loop) => loop.repeat(reverse: true),
+                              )
+                              .scale(
+                                begin: const Offset(1, 1),
+                                end: const Offset(1.2, 1.2),
+                                duration: 1000.ms,
+                              )
                           : _buildToolbarIcon(Icons.mic_none, _listen),
-
                       _buildToolbarIcon(Icons.auto_awesome, () {
                         _showAIMagicSheet();
                       }, color: const Color(0xFFFFD700)),

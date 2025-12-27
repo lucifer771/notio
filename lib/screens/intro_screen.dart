@@ -3,6 +3,7 @@ import 'package:notio/models/user_model.dart';
 import 'package:notio/screens/home_screen.dart';
 import 'package:notio/services/storage_service.dart';
 import 'package:notio/widgets/animated_logo.dart';
+import 'package:notio/utils/translations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class IntroScreen extends StatefulWidget {
@@ -37,11 +38,11 @@ class _IntroScreenState extends State<IntroScreen>
 
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
-          ),
-        );
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
 
     _controller.forward();
   }
@@ -115,22 +116,22 @@ class _IntroScreenState extends State<IntroScreen>
                   child: Column(
                     children: [
                       Text(
-                        'NOTIO',
-                        style: Theme.of(context).textTheme.displayLarge
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 4,
-                              color: Colors.white,
-                            ),
+                        'NOTIO', // Brand name
+                        style:
+                            Theme.of(context).textTheme.displayLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 4,
+                                  color: Colors.white,
+                                ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Write Smarter.',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.grey[400],
-                              fontWeight: FontWeight.w300,
-                            ),
+                        'write_smarter'.tr,
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: Colors.grey[400],
+                                  fontWeight: FontWeight.w300,
+                                ),
                       ),
                     ],
                   ),
@@ -142,7 +143,7 @@ class _IntroScreenState extends State<IntroScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "What's your name?",
+                        "whats_your_name".tr,
                         style: TextStyle(color: Colors.grey[400], fontSize: 16),
                       ),
                       const SizedBox(height: 12),
@@ -156,7 +157,7 @@ class _IntroScreenState extends State<IntroScreen>
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.1),
-                          hintText: 'Enter your name',
+                          hintText: 'enter_name'.tr,
                           hintStyle: TextStyle(color: Colors.grey[600]),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
@@ -188,8 +189,8 @@ class _IntroScreenState extends State<IntroScreen>
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: const Text(
-                      'Get Started',
+                    child: Text(
+                      'get_started'.tr,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,

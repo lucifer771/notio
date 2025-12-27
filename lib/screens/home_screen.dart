@@ -10,6 +10,11 @@ import 'package:notio/services/storage_service.dart';
 import 'package:notio/widgets/animated_logo.dart';
 import 'package:notio/widgets/note_card.dart';
 import 'package:notio/widgets/collaboration_animation.dart';
+import 'package:notio/widgets/reminder_selector.dart';
+import 'package:notio/services/notification_service.dart';
+import 'package:notio/widgets/settings_content.dart';
+import 'package:notio/utils/translations.dart'; // Import extensions
+import 'package:notio/services/localization_service.dart';
 import 'package:uuid/uuid.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -32,20 +37,13 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   // Reminders list (still dummy for now as per plan focus on Tags/Notes persistence first, but keeping structure)
-  final List<Reminder> _reminders = [
-    Reminder(
-      id: '1',
-      title: 'Team Meeting Notes',
-      dateTime: DateTime.now(),
-      repeat: 'Repeats Daily',
-      time: const TimeOfDay(hour: 9, minute: 0),
-    ),
-  ];
+  List<Reminder> _reminders = [];
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    NotificationService().init();
   }
 
   void _loadData() {
@@ -53,8 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _notes = StorageService().getNotes();
       _tags = StorageService().getTags();
       _userProfile = StorageService().getUserProfile();
+      _reminders = StorageService().getReminders();
     });
   }
+
+  // ... (Save Notes/Tags methods)
 
   void _saveNotes() {
     StorageService().saveNotes(_notes);
@@ -71,6 +72,38 @@ class _HomeScreenState extends State<HomeScreen> {
     _saveNotes();
   }
 
+  void _saveReminders() {
+    StorageService().saveReminders(_reminders);
+  }
+
+  // ... (Add Note/Tag methods)
+
+  Future<void> _addReminder() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => ReminderSelector(
+        onReminderCreated: (reminder) {
+          setState(() {
+            _reminders.add(reminder);
+          });
+          _saveReminders();
+          NotificationService().scheduleReminder(reminder);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text('Reminder set for ${reminder.time.format(context)}'),
+              backgroundColor: const Color(0xFF6C63FF),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _addTag(Tag tag) {
     if (!_tags.any((t) => t.name == tag.name)) {
       setState(() {
@@ -80,12 +113,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _deleteTag(String tagId) {
+    setState(() {
+      _tags.removeWhere((t) => t.id == tagId);
+      // Also remove this tag from all notes? Optional but good for consistency
+      // For now, just remove the tag definition.
+    });
+    _saveTags();
+  }
+
   Future<void> _navigateToCreateNote() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            NoteEditorScreen(availableTags: _tags, onTagCreated: _addTag),
+        builder: (context) => NoteEditorScreen(
+          availableTags: _tags,
+          onTagCreated: _addTag,
+          onTagDeleted: _deleteTag,
+        ),
       ),
     );
 
@@ -102,6 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
           note: note,
           availableTags: _tags,
           onTagCreated: _addTag,
+          onTagDeleted: _deleteTag,
         ),
       ),
     );
@@ -206,37 +252,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).scaffoldBackgroundColor,
-              const Color(0xFF0F0F1A),
-            ],
+    // Listen to locale changes for real-time translation updates
+    return ValueListenableBuilder<Locale>(
+      valueListenable: LocalizationService.currentLocale,
+      builder: (context, locale, child) {
+        return Scaffold(
+          extendBody: true,
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Theme.of(context).scaffoldBackgroundColor,
+                  const Color(0xFF0F0F1A),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: [
+                  _buildHomeContent(),
+                  _buildTagsContent(),
+                  _buildRemindersContent(),
+                  const SettingsContent(),
+                ],
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: [
-              _buildHomeContent(),
-              _buildTagsContent(),
-              _buildRemindersContent(),
-              _buildPlaceholder('Settings'),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
-      floatingActionButton: _selectedIndex == 0
-          ? _buildFloatingActionButton()
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+          bottomNavigationBar: _buildBottomNavigationBar(),
+          floatingActionButton:
+              _selectedIndex == 0 ? _buildFloatingActionButton() : null,
+          floatingActionButtonLocation:
+              FloatingActionButtonLocation.centerDocked,
+        );
+      },
     );
   }
 
@@ -250,16 +302,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final displayNotes = _searchController.text.isEmpty
         ? filteredNotes
         : filteredNotes
-              .where(
-                (n) =>
-                    n.title.toLowerCase().contains(
-                      _searchController.text.toLowerCase(),
-                    ) ||
-                    n.content.toLowerCase().contains(
-                      _searchController.text.toLowerCase(),
-                    ),
-              )
-              .toList();
+            .where(
+              (n) =>
+                  n.title.toLowerCase().contains(
+                        _searchController.text.toLowerCase(),
+                      ) ||
+                  n.content.toLowerCase().contains(
+                        _searchController.text.toLowerCase(),
+                      ),
+            )
+            .toList();
 
     return CustomScrollView(
       slivers: [
@@ -276,9 +328,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 'NOTIO',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
               ),
             ],
           ),
@@ -335,11 +387,11 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hello, ${_userProfile.name} 👋',
+                  '${'hello'.tr}, ${_userProfile.name} 👋',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                 ),
                 const SizedBox(height: 20),
                 // --- Search Bar ---
@@ -354,11 +406,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         transitionsBuilder:
                             (context, animation, secondaryAnimation, child) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              );
-                            },
+                          return FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          );
+                        },
                       ),
                     );
                   },
@@ -382,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(Icons.search, color: Colors.grey[600]),
                           const SizedBox(width: 12),
                           Text(
-                            'Search notes...',
+                            'search_notes'.tr,
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 16,
@@ -465,16 +517,16 @@ class _HomeScreenState extends State<HomeScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Tags',
-                  style: TextStyle(
+                Text(
+                  'tags'.tr,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  'Organize your notes',
+                  'organize_notes'.tr,
                   style: TextStyle(color: Colors.grey[400], fontSize: 12),
                 ),
               ],
@@ -507,9 +559,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
-                      ..._tags
-                          .take(6)
-                          .map(
+                      ..._tags.take(6).map(
                             (tag) => Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: _buildTagChip(tag),
@@ -538,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              isExpanded ? 'Less' : 'More',
+              isExpanded ? 'less'.tr : 'more'.tr,
               style: const TextStyle(color: Colors.white, fontSize: 12),
             ),
             Icon(
@@ -566,9 +616,8 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected
-              ? tagColor.withOpacity(0.2)
-              : const Color(0xFF1A1A2E),
+          color:
+              isSelected ? tagColor.withOpacity(0.2) : const Color(0xFF1A1A2E),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? tagColor : Colors.white.withOpacity(0.1),
@@ -624,10 +673,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 20),
           Icon(Icons.label_outline, size: 48, color: Colors.grey[800]),
           const SizedBox(height: 8),
-          Text("No tags yet", style: TextStyle(color: Colors.grey[600])),
+          Text("no_tags".tr, style: TextStyle(color: Colors.grey[600])),
           TextButton(
             onPressed: _showCreateTagDialog,
-            child: const Text("Create your first tag"),
+            child: Text("create_first_tag".tr),
           ),
         ],
       ),
@@ -685,10 +734,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               onTap: () {
                 Navigator.pop(context);
-                setState(() {
-                  _tags.removeWhere((t) => t.id == tag.id);
-                  if (_selectedTagId == tag.id) _selectedTagId = null;
-                });
+                _deleteTag(tag.id);
+                if (_selectedTagId == tag.id) {
+                  setState(() => _selectedTagId = null);
+                }
               },
             ),
           ],
@@ -700,7 +749,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTagsContent() {
     return Column(
       children: [
-        _buildHeader('Tags'),
+        _buildHeader('tags'.tr),
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
@@ -770,11 +819,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 8),
                         _buildSmallIconButton(
                           Icons.delete_outline,
-                          onTap: () {
-                            setState(() {
-                              _tags.removeAt(index);
-                            });
-                          },
+                          onTap: () => _deleteTag(tag.id),
                         ),
                       ],
                     ),
@@ -792,121 +837,148 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _deleteReminder(Reminder reminder) async {
+    setState(() {
+      _reminders.removeWhere((r) => r.id == reminder.id);
+    });
+    _saveReminders();
+    await NotificationService().cancelReminder(reminder);
+  }
+
   Widget _buildRemindersContent() {
     return Column(
       children: [
         _buildHeader('Reminders'),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-            itemCount: _reminders.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final reminder = _reminders[index];
-              return Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A0E21),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
-                    width: 1,
+          child: _reminders.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.alarm, size: 64, color: Colors.grey[800]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No reminders set',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          reminder.time.format(context),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                  itemCount: _reminders.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final reminder = _reminders[index];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A0E21),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF6C63FF).withOpacity(0.15),
+                          width: 1,
                         ),
-                        Row(
-                          children: [
-                            _buildSmallIconButton(Icons.edit_outlined),
-                            const SizedBox(width: 8),
-                            _buildSmallIconButton(
-                              Icons.delete_outline,
-                              isRed: true,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getRelativeDate(reminder.dateTime),
-                      style: const TextStyle(
-                        color: Color(0xFF6C63FF),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Divider(color: Colors.grey[800], height: 1),
-                    const SizedBox(height: 16),
-                    Text(
-                      reminder.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (reminder.repeat != 'None')
-                      Row(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(
-                            Icons.notifications_active_outlined,
-                            color: Color(0xFF6C63FF),
-                            size: 16,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                reminder.time.format(context),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  _buildSmallIconButton(Icons.edit_outlined),
+                                  const SizedBox(width: 8),
+                                  _buildSmallIconButton(
+                                    Icons.delete_outline,
+                                    isRed: true,
+                                    onTap: () => _deleteReminder(reminder),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(height: 4),
                           Text(
-                            reminder.repeat,
+                            _getRelativeDate(reminder.dateTime),
                             style: const TextStyle(
                               color: Color(0xFF6C63FF),
-                              fontSize: 14,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          Divider(color: Colors.grey[800], height: 1),
+                          const SizedBox(height: 16),
+                          Text(
+                            reminder.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (reminder.repeat != 'None')
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.notifications_active_outlined,
+                                  color: Color(0xFF6C63FF),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  reminder.repeat,
+                                  style: const TextStyle(
+                                    color: Color(0xFF6C63FF),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(0, 0, 20, 110),
           child: Align(
             alignment: Alignment.bottomRight,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [Color(0xFF8E8AFF), Color(0xFF6C63FF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x666C63FF),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+            child: GestureDetector(
+              onTap: _addReminder,
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF8E8AFF), Color(0xFF6C63FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x666C63FF),
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 30),
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 30),
             ),
           ),
         ),
@@ -1025,22 +1097,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder(String title) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.construction, size: 60, color: Colors.grey[700]),
-          const SizedBox(height: 20),
-          Text(
-            '$title Coming Soon',
-            style: const TextStyle(color: Colors.grey, fontSize: 18),
-          ),
-        ],
       ),
     );
   }
